@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "skrape-py"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Python library for easily interacting with Skrape.ai API with type-safe schemas using Pydantic"
-authors = ["Jens Lys"]
+authors = ["jenslys"]
 readme = "README.md"
-packages = [{include = "skrape"}]
+packages = [{ include = "skrape" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"

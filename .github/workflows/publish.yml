@@ -1,11 +1,17 @@
-name: Publish to PyPI
+name: CI/CD
 
+# Triggers on:
+# 1. Any push to master (including PR merges)
+# 2. When a PR is opened/updated targeting master
 on:
-  release:
-    types: [published]
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 jobs:
-  publish:
+  # Test job runs on both PR and push to master
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,15 +25,55 @@ jobs:
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
       
-      - name: Configure Poetry
-        run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
-      
       - name: Install dependencies
         run: poetry install
       
       - name: Run tests
         run: poetry run pytest
+
+  # Publish job only runs on push to master (including PR merges)
+  # and only publishes if version has changed
+  publish:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check version change
+        id: check_version
+        run: |
+          echo "Checking if version changed in this commit..."
+          CURRENT_VERSION=$(git show HEAD:pyproject.toml | grep version | head -n 1 | cut -d'"' -f2)
+          PREVIOUS_VERSION=$(git show HEAD^:pyproject.toml | grep version | head -n 1 | cut -d'"' -f2)
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "✨ Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ Version unchanged ($CURRENT_VERSION)"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set up Python
+        if: steps.check_version.outputs.version_changed == 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      
+      - name: Install Poetry
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+      
+      - name: Configure Poetry
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
       
       - name: Build and publish
-        run: poetry publish --build
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          echo "🚀 Publishing version $(poetry version -s) to PyPI..."
+          poetry publish --build
