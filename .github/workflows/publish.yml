@@ -29,6 +29,8 @@ jobs:
         run: poetry install
       
       - name: Run tests
+        env:
+          SKRAPE_API_KEY: ${{ secrets.SKRAPE_API_KEY }}
         run: poetry run pytest
 
   # Publish job only runs on push to master (including PR merges)

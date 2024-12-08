@@ -14,10 +14,13 @@ class SimpleSchema(BaseModel):
     description: str
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
 async def test_extract_simple():
     """Test extracting simple data."""
     api_key = os.getenv("SKRAPE_API_KEY")
-    assert api_key, "SKRAPE_API_KEY environment variable is not set"
     
     async with Skrape(api_key=api_key) as skrape:
         response = await skrape.extract(
@@ -50,10 +53,13 @@ async def test_invalid_api_key():
         assert "Invalid or missing API key" in str(exc_info.value)
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
 async def test_invalid_url():
     """Test that invalid URL raises appropriate error."""
     api_key = os.getenv("SKRAPE_API_KEY")
-    assert api_key, "SKRAPE_API_KEY environment variable is not set"
     
     async with Skrape(api_key=api_key) as skrape:
         with pytest.raises(SkrapeAPIError):
@@ -64,10 +70,13 @@ async def test_invalid_url():
             )
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
 async def test_rate_limit():
     """Test handling of rate limit errors."""
     api_key = os.getenv("SKRAPE_API_KEY")
-    assert api_key, "SKRAPE_API_KEY environment variable is not set"
     
     # Make multiple requests to trigger rate limit
     async with Skrape(api_key=api_key) as skrape:
