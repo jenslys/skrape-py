@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "skrape-py"
-version = "1.0.1"
+version = "1.0.2"
 description = "A Python library for easily interacting with Skrape.ai API with type-safe schemas using Pydantic"
 authors = ["jenslys"]
 readme = "README.md"
 packages = [{ include = "skrape" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.11"
 pydantic = "^2.5.2"
 httpx = "^0.25.2"
 python-dotenv = "^1.0.0"

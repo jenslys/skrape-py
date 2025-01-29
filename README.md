@@ -8,6 +8,9 @@ A Python library for easily interacting with Skrape.ai API. Define your scraping
 - 🚀 **Simple API**: Just define a schema and get your data
 - 🔄 **Async Support**: Built with async/await for efficient scraping
 - 🧩 **Minimal Dependencies**: Built on top of proven libraries like Pydantic and httpx
+- 📝 **Markdown Conversion**: Convert any webpage to clean markdown
+- 🕷️ **Web Crawling**: Crawl multiple pages with browser automation
+- 🔄 **Background Jobs**: Handle long-running tasks asynchronously
 
 ## Installation
 
@@ -33,6 +36,8 @@ Get your API key on [Skrape.ai](https://skrape.ai)
 
 ## Quick Start
 
+### Extract Structured Data
+
 ```python
 from skrape import Skrape
 from pydantic import BaseModel
@@ -48,69 +53,94 @@ class ProductSchema(BaseModel):
     rating: float
 
 async def main():
-    # Use the client as an async context manager
     async with Skrape(api_key=os.getenv("SKRAPE_API_KEY")) as skrape:
-        # Extract data
-        response = await skrape.extract(
+        # Start extraction job
+        job = await skrape.extract(
             "https://example.com/product",
             ProductSchema,
-            {"render_js": True}  # Enable JavaScript rendering if needed
+            {"renderJs": True}  # Enable JavaScript rendering if needed
         )
         
+        # Wait for job to complete and get results
+        while job.status != "COMPLETED":
+            job = await skrape.get_job(job.jobId)
+            await asyncio.sleep(1)
+        
         # Access the extracted data
-        product = response.result
+        product = job.result
         print(f"Product: {product.title}")
         print(f"Price: ${product.price}")
-        
-        # Access rate limit information
-        usage = response.usage
-        print(f"Remaining credits: {usage.remaining}")
-        print(f"Rate limit reset: {usage.rateLimit.reset}")
 
-# Run the async function
 asyncio.run(main())
 ```
 
-## Schema Definition
-
-We leverage Pydantic for defining schemas. Here's a more complex example:
+### Convert to Markdown
 
 ```python
-from typing import List, Optional
-from pydantic import BaseModel, Field
+# Single URL
+response = await skrape.to_markdown(
+    "https://example.com/article",
+    {"renderJs": True}
+)
+print(response.result)  # Clean markdown content
 
-class Review(BaseModel):
-    author: str
-    rating: float = Field(ge=0, le=5)  # Rating between 0 and 5
-    text: str
-    date: str
-    helpful_votes: Optional[int] = None
+# Multiple URLs (async)
+job = await skrape.to_markdown_bulk(
+    ["https://example.com/1", "https://example.com/2"],
+    {"renderJs": True}
+)
 
-class ProductDetails(BaseModel):
-    title: str
-    price: float
-    description: str
-    rating: float
-    reviews: List[Review]
-    in_stock: bool
-    shipping_info: Optional[str] = None
+# Get results when ready
+while job.status != "COMPLETED":
+    job = await skrape.get_job(job.jobId)
+    await asyncio.sleep(1)
+
+for markdown in job.result:
+    print(markdown)
 ```
 
-For a comprehensive understanding of all available options and advanced schema configurations, we recommend exploring [Pydantic's documentation](https://docs.pydantic.dev/).
+### Web Crawling
+
+```python
+# Start crawling job
+job = await skrape.crawl(
+    ["https://example.com", "https://example.com/page2"],
+    {
+        "renderJs": True,
+        "actions": [
+            {"scroll": {"distance": 500}},  # Scroll down 500px
+            {"wait_for": ".content"}  # Wait for content to load
+        ]
+    }
+)
+
+# Get results when ready
+while job.status != "COMPLETED":
+    job = await skrape.get_job(job.jobId)
+    await asyncio.sleep(1)
+
+for page in job.result:
+    print(page)
+```
 
 ## API Options
 
-When calling `extract()`, you can pass additional options:
+Common options for all endpoints:
 
 ```python
-response = await skrape.extract(
-    url, 
-    schema,
-    {
-        "render_js": True,  # Enable JavaScript rendering
-        # Add other options as needed
-    }
-)
+options = {
+    "renderJs": True,  # Enable JavaScript rendering
+    "actions": [
+        {"click": {"selector": ".button"}},  # Click element
+        {"scroll": {"distance": 500}},       # Scroll page
+        {"wait_for": ".content"},           # Wait for element
+        {"type": {                          # Type into input
+            "selector": "input",
+            "text": "search term"
+        }}
+    ],
+    "callbackUrl": "https://your-server.com/webhook"  # For async jobs
+}
 ```
 
 ## Error Handling
@@ -124,10 +154,8 @@ async with Skrape(api_key=os.getenv("SKRAPE_API_KEY")) as skrape:
     try:
         response = await skrape.extract(url, schema)
     except SkrapeValidationError as e:
-        # Schema validation failed
         print(f"Data doesn't match schema: {e}")
     except SkrapeAPIError as e:
-        # API request failed (e.g., rate limit exceeded, invalid API key)
         print(f"API error: {e}")
 ```
 
@@ -136,7 +164,7 @@ async with Skrape(api_key=os.getenv("SKRAPE_API_KEY")) as skrape:
 The API response includes rate limit information that you can use to manage your requests:
 
 ```python
-response = await skrape.extract(url, schema)
+response = await skrape.to_markdown(url)
 usage = response.usage
 
 print(f"Remaining credits: {usage.remaining}")
@@ -145,4 +173,3 @@ print(f"  - Remaining: {usage.rateLimit.remaining}")
 print(f"  - Base limit: {usage.rateLimit.baseLimit}")
 print(f"  - Burst limit: {usage.rateLimit.burstLimit}")
 print(f"  - Reset at: {usage.rateLimit.reset}")
-```

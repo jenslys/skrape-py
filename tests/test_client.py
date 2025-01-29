@@ -26,19 +26,87 @@ async def test_extract_simple():
         response = await skrape.extract(
             "https://example.com",
             SimpleSchema,
-            {"render_js": False}
+            {"renderJs": False}
         )
         
-        # Validate result
-        assert response.result.title
-        assert response.result.description
+        # Validate job response
+        assert response.jobId == "immediate"
+        assert response.status == "COMPLETED"
+        assert response.result
+        assert response.result["title"]
+        assert response.result["description"]
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
+async def test_markdown():
+    """Test converting URL to markdown."""
+    api_key = os.getenv("SKRAPE_API_KEY")
+    
+    async with Skrape(api_key=api_key) as skrape:
+        response = await skrape.markdown(
+            "https://example.com",
+            {"renderJs": False}
+        )
         
-        # Validate usage info
-        assert isinstance(response.usage.remaining, int)
-        assert isinstance(response.usage.rateLimit.remaining, int)
-        assert isinstance(response.usage.rateLimit.reset, int)
-        assert isinstance(response.usage.rateLimit.baseLimit, int)
-        assert isinstance(response.usage.rateLimit.burstLimit, int)
+        # Validate markdown response
+        assert isinstance(response.result, str)
+        assert response.usage.remaining >= 0
+        assert response.usage.rateLimit.remaining >= 0
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
+async def test_markdown_bulk():
+    """Test bulk markdown conversion."""
+    api_key = os.getenv("SKRAPE_API_KEY")
+    
+    async with Skrape(api_key=api_key) as skrape:
+        response = await skrape.markdown_bulk(
+            ["https://example.com", "https://example.org"],
+            {"renderJs": False}
+        )
+        
+        # Validate job response
+        assert response.jobId
+        assert response.status in ["PENDING", "RUNNING", "COMPLETED"]
+        
+        if response.status == "COMPLETED":
+            job = await skrape.get_job(response.jobId)
+            assert job.result
+            assert job.status == "COMPLETED"
+            assert isinstance(job.result, list)
+            assert len(job.result) == 2
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("SKRAPE_API_KEY"),
+    reason="SKRAPE_API_KEY environment variable is not set"
+)
+async def test_crawl():
+    """Test crawling multiple URLs."""
+    api_key = os.getenv("SKRAPE_API_KEY")
+    
+    async with Skrape(api_key=api_key) as skrape:
+        response = await skrape.crawl(
+            ["https://example.com", "https://example.org"],
+            {"renderJs": False}
+        )
+        
+        # Validate job response
+        assert response.jobId
+        assert response.status in ["PENDING", "RUNNING", "COMPLETED"]
+        
+        if response.status == "COMPLETED":
+            job = await skrape.get_job(response.jobId)
+            assert job.result
+            assert job.status == "COMPLETED"
+            assert isinstance(job.result, list)
+            assert len(job.result) == 2
 
 @pytest.mark.asyncio
 async def test_invalid_api_key():
@@ -48,7 +116,7 @@ async def test_invalid_api_key():
             await skrape.extract(
                 "https://example.com",
                 SimpleSchema,
-                {"render_js": False}
+                {"renderJs": False}
             )
         assert "Invalid or missing API key" in str(exc_info.value)
 
@@ -66,7 +134,7 @@ async def test_invalid_url():
             await skrape.extract(
                 "https://this-url-does-not-exist.com",
                 SimpleSchema,
-                {"render_js": False}
+                {"renderJs": False}
             )
 
 @pytest.mark.asyncio
@@ -85,7 +153,7 @@ async def test_rate_limit():
                 await skrape.extract(
                     "https://example.com",
                     SimpleSchema,
-                    {"render_js": False}
+                    {"renderJs": False}
                 )
             except SkrapeAPIError as e:
                 if "Rate limit exceeded" in str(e):
